@@ -61,7 +61,7 @@ add_action('admin_menu', function () {
             }
         }
 
-        ?>
+?>
         <div class="wrap">
             <h1>Upload Text File Here</h1>
             <form method="post" action="" enctype="multipart/form-data">
@@ -74,6 +74,39 @@ add_action('admin_menu', function () {
                 <?php submit_button(); ?>
             </form>
         </div>
-        <?php
+<?php
     }, '');
 });
+
+add_shortcode('line-picker', function () {
+    global $wpdb;
+    $table = "{$wpdb->prefix}line_picker";
+    $maxShown = (int) $wpdb->get_var("SELECT MAX(shown_times) FROM $table");
+
+    $picked = linePickerPick($maxShown - 1);
+    $newMark = $maxShown;
+    if (0 === count($picked)) {
+        $picked = linePickerPick($maxShown);
+        $newMark = $maxShown + 1;
+    }
+
+    $result = [];
+    foreach ($picked as $record) {
+        $result[] = $record->user;
+        $wpdb->update(
+            $table,
+            ['shown_times' => $newMark],
+            ['id' => $record->id],
+            ['%d'],
+            ['%d']
+        );
+    }
+    return implode(', ', $result);
+});
+
+function linePickerPick($shownTimes)
+{
+    global $wpdb;
+    $table = "{$wpdb->prefix}line_picker";
+    return $wpdb->get_results("SELECT * FROM $table WHERE shown_times = $shownTimes LIMIT 3");
+}
