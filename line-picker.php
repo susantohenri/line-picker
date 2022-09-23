@@ -79,29 +79,50 @@ add_action('admin_menu', function () {
 });
 
 add_shortcode('line-picker', function () {
-    global $wpdb;
-    $table = "{$wpdb->prefix}line_picker";
-    $maxShown = (int) $wpdb->get_var("SELECT MAX(shown_times) FROM $table");
+    wp_register_script('jquery', 'https://code.jquery.com/jquery-3.6.1.slim.min.js');
+    wp_enqueue_script('jquery');
 
-    $picked = linePickerPick($maxShown - 1);
-    $newMark = $maxShown;
-    if (0 === count($picked)) {
-        $picked = linePickerPick($maxShown);
-        $newMark = $maxShown + 1;
-    }
+    wp_register_script('line-picker', plugin_dir_url(__FILE__) . 'line-picker.js');
+    wp_enqueue_script('line-picker');
+    wp_localize_script(
+        'line-picker',
+        'line_picker',
+        array(
+            'users' => site_url('wp-json/line-picker/v1/users'),
+        )
+    );
+    return "<p id='line-picker'></p>";
+});
 
-    $result = [];
-    foreach ($picked as $record) {
-        $result[] = $record->user;
-        $wpdb->update(
-            $table,
-            ['shown_times' => $newMark],
-            ['id' => $record->id],
-            ['%d'],
-            ['%d']
-        );
-    }
-    return implode(', ', $result);
+add_action('rest_api_init', function () {
+    register_rest_route('line-picker/v1', '/users', array(
+        'methods' => 'GET',
+        'callback' => function () {
+            global $wpdb;
+            $table = "{$wpdb->prefix}line_picker";
+            $maxShown = (int) $wpdb->get_var("SELECT MAX(shown_times) FROM $table");
+
+            $picked = linePickerPick($maxShown - 1);
+            $newMark = $maxShown;
+            if (0 === count($picked)) {
+                $picked = linePickerPick($maxShown);
+                $newMark = $maxShown + 1;
+            }
+
+            $result = [];
+            foreach ($picked as $record) {
+                $result[] = $record->user;
+                $wpdb->update(
+                    $table,
+                    ['shown_times' => $newMark],
+                    ['id' => $record->id],
+                    ['%d'],
+                    ['%d']
+                );
+            }
+            return implode(' ', $result);
+        }
+    ));
 });
 
 function linePickerPick($shownTimes)
